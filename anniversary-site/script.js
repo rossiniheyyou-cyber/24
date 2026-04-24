@@ -10,6 +10,7 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener("resize", () => {
   resizeCanvas();
+  buildWhiteStars();
   buildStars();
 });
 
@@ -35,8 +36,10 @@ const images = [
 
 // ===== STARS =====
 let stars = [];
+let whiteStars = [];
 const TOTAL_STARS = 16;
 const SPECIAL_STAR_COUNT = 16;
+const WHITE_STAR_COUNT = 140;
 const controlPanel = document.getElementById("controlPanel");
 const anniversaryTitle = document.getElementById("anniversaryTitle");
 const hintLabel = document.getElementById("hint");
@@ -133,11 +136,45 @@ function buildStars() {
   }
 }
 
+function buildWhiteStars() {
+  whiteStars = [];
+  const canvasPadding = 8;
+
+  for (let i = 0; i < WHITE_STAR_COUNT; i++) {
+    const size = Math.random() * 2.2 + 0.5;
+    const x =
+      Math.random() * (canvas.width - (canvasPadding + size) * 2) +
+      (canvasPadding + size);
+    const y =
+      Math.random() * (canvas.height - (canvasPadding + size) * 2) +
+      (canvasPadding + size);
+
+    whiteStars.push({
+      x,
+      y,
+      size,
+      blink: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+buildWhiteStars();
 buildStars();
 
 // ===== DRAW STARS =====
 function drawStars() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  whiteStars.forEach(star => {
+    star.blink += 0.03;
+    const opacity = 0.35 + Math.abs(Math.sin(star.blink)) * 0.55;
+
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+    ctx.shadowBlur = 0;
+    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
   stars.forEach(star => {
     star.blink += 0.05;
