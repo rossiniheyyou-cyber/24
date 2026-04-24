@@ -1,3 +1,77 @@
+const ALLOWED_EMAILS = new Set([
+  "rossini.heyyou@gmail.com",
+  "ashwathbalaji451@gmail.com"
+]);
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA5aMSOSKav9kVgni1YvVjQKMGYtc_ov0E",
+  authDomain: "none-55a50.firebaseapp.com",
+  projectId: "none-55a50",
+  storageBucket: "none-55a50.firebasestorage.app",
+  messagingSenderId: "1078720031231",
+  appId: "1:1078720031231:web:d6689509bbe8b4ac7adfca"
+};
+
+const authScreen = document.getElementById("authScreen");
+const appRoot = document.getElementById("appRoot");
+const authMessage = document.getElementById("authMessage");
+const googleSignInBtn = document.getElementById("googleSignInBtn");
+let appInitialized = false;
+
+function setAuthMessage(message) {
+  authMessage.textContent = message;
+}
+
+function initAuth() {
+  try {
+    firebase.initializeApp(firebaseConfig);
+  } catch (e) {
+    setAuthMessage("Auth setup failed.");
+    return;
+  }
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+
+  function allowUser(user) {
+    const email = (user.email || "").toLowerCase();
+    if (!ALLOWED_EMAILS.has(email)) {
+      firebase.auth().signOut();
+      setAuthMessage("This account is not authorized.");
+      return false;
+    }
+    authScreen.classList.add("hidden");
+    appRoot.classList.remove("hidden");
+    if (!appInitialized) {
+      initApp();
+      appInitialized = true;
+    }
+    return true;
+  }
+
+  googleSignInBtn.addEventListener("click", async () => {
+    try {
+      setAuthMessage("");
+      await firebase.auth().signInWithPopup(provider);
+    } catch (err) {
+      if (err && (err.code === "auth/popup-blocked" || err.code === "auth/popup-closed-by-user")) {
+        await firebase.auth().signInWithRedirect(provider);
+        return;
+      }
+      setAuthMessage("Sign in failed. Try again.");
+    }
+  });
+
+  firebase.auth().onAuthStateChanged((user) => {
+    if (!user) {
+      authScreen.classList.remove("hidden");
+      appRoot.classList.add("hidden");
+      return;
+    }
+    allowUser(user);
+  });
+}
+
 function initApp() {
   // ===== CANVAS SETUP =====
   const canvas = document.getElementById("sky");
@@ -9,24 +83,26 @@ function initApp() {
   }
 
   // ===== IMAGES =====
-  const images = [
-    "../images/img1.jpg",
-    "../images/img4.jpeg",
-    "../images/img5.jpeg",
-    "../images/img6.jpeg",
-    "../images/img7.jpeg",
-    "../images/img8.jpeg",
-    "../images/img9.jpeg",
-    "../images/img10.jpeg",
-    "../images/img11.jpeg",
-    "../images/img12.jpeg",
-    "../images/img13.jpeg",
-    "../images/img14.jpeg",
-    "../images/img15.jpeg",
-    "../images/img16.jpeg",
-    "../images/img2.jpg",
-    "../images/img3.jpg"
+  const imageVersion = "20260424-2242";
+  const rawImages = [
+    "/images/img1.jpg",
+    "/images/img2.jpg",
+    "/images/img3.jpg",
+    "/images/img4.jpeg",
+    "/images/img5.jpeg",
+    "/images/img6.jpeg",
+    "/images/img7.jpeg",
+    "/images/img8.jpeg",
+    "/images/img9.jpeg",
+    "/images/img10.jpeg",
+    "/images/img11.jpeg",
+    "/images/img12.jpeg",
+    "/images/img13.jpeg",
+    "/images/img14.jpeg",
+    "/images/img15.jpeg",
+    "/images/img16.jpeg"
   ];
+  const images = rawImages.map((path, idx) => `${path}?v=${imageVersion}&i=${idx + 1}`);
 
   // ===== STARS =====
   let stars = [];
@@ -83,6 +159,7 @@ function initApp() {
   }
 
   const uniqueSpecialImages = [...images];
+  // Enforce a strict one-to-one mapping: 16 images -> 16 golden stars.
   while (uniqueSpecialImages.length < SPECIAL_STAR_COUNT) {
     uniqueSpecialImages.push(createFallbackImageDataUri(`Memory ${uniqueSpecialImages.length + 1}`));
   }
@@ -107,14 +184,32 @@ function initApp() {
     }
   }
 
-  resizeCanvas();
-  buildWhiteStars();
-  buildStars();
-  window.addEventListener("resize", () => {
-    resizeCanvas();
-    buildWhiteStars();
-    buildStars();
-  });
+  function preloadImage(src) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve(src);
+      image.onerror = () => resolve(null);
+      image.src = src;
+    });
+  }
+
+  async function preloadImagesWithRetry() {
+    const firstPass = await Promise.all(images.map(preloadImage));
+    const missingIndices = firstPass
+      .map((value, idx) => (value ? -1 : idx))
+      .filter((idx) => idx !== -1);
+
+    if (missingIndices.length === 0) {
+      return firstPass;
+    }
+
+    const retryPass = [...firstPass];
+    for (const idx of missingIndices) {
+      const noCacheSrc = `${rawImages[idx]}?v=${imageVersion}&i=${idx + 1}&retry=${Date.now()}`;
+      retryPass[idx] = await preloadImage(noCacheSrc);
+    }
+    return retryPass;
+  }
 
   function drawStars() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -139,7 +234,28 @@ function initApp() {
     });
     requestAnimationFrame(drawStars);
   }
-  drawStars();
+  async function startSky() {
+    const verifiedImages = await preloadImagesWithRetry();
+    for (let i = 0; i < SPECIAL_STAR_COUNT; i++) {
+      if (verifiedImages[i]) {
+        uniqueSpecialImages[i] = verifiedImages[i];
+      } else {
+        uniqueSpecialImages[i] = createFallbackImageDataUri(`Memory ${i + 1}`);
+      }
+    }
+
+    resizeCanvas();
+    buildWhiteStars();
+    buildStars();
+    window.addEventListener("resize", () => {
+      resizeCanvas();
+      buildWhiteStars();
+      buildStars();
+    });
+    drawStars();
+  }
+
+  startSky();
 
   // ===== CLICKABLE STARS =====
   const popup = document.getElementById("popup");
@@ -148,6 +264,7 @@ function initApp() {
 
   function showImage(src) {
     popup.classList.remove("hidden");
+    popupImg.setAttribute("alt", "");
     popupImg.src = src;
   }
 
@@ -220,7 +337,11 @@ function initApp() {
   async function playSong() {
     updateNowPlaying();
     const song = songs[currentSong];
-    const played = await tryPlayFromPaths([`music/${song.file}`, `../music/${song.file}`]);
+    const played = await tryPlayFromPaths([
+      `anniversary-site/music/${song.file}`,
+      `music/${song.file}`,
+      `../music/${song.file}`
+    ]);
     if (!played) {
       nowPlayingLabel.textContent = "Now playing: Song file missing or blocked";
       startBtn.textContent = "Play me";
@@ -261,4 +382,4 @@ function initApp() {
   });
 }
 
-initApp();
+initAuth();

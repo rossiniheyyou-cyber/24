@@ -3,9 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <title>Our Night Sky 💖</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/anniversary-site/style.css">
 </head>
 <body>
+<div id="authScreen">
+  <h1>Private Anniversary Space</h1>
+  <p>Sign in with your approved Google account.</p>
+  <button id="googleSignInBtn">Sign in with Google</button>
+  <p id="authMessage"></p>
+</div>
+
+<div id="appRoot" class="hidden">
 <canvas id="sky"></canvas>
 
 <p id="anniversaryTitle">Happy Anniversary Mu ❤️</p>
@@ -24,7 +32,10 @@
   <span id="close">&times;</span>
   <img id="popupImg">
 </div>
+</div>
 
-<script src="script.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="/anniversary-site/script.js?v=20260424-2248"></script>
 </body>
 </html>
