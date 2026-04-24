@@ -8,7 +8,10 @@ function resizeCanvas() {
 }
 
 resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", () => {
+  resizeCanvas();
+  buildStars();
+});
 
 // ===== IMAGES =====
 const images = [
@@ -32,9 +35,11 @@ const images = [
 
 // ===== STARS =====
 let stars = [];
-const TOTAL_STARS = 150;
+const TOTAL_STARS = 16;
 const SPECIAL_STAR_COUNT = 16;
 const controlPanel = document.getElementById("controlPanel");
+const anniversaryTitle = document.getElementById("anniversaryTitle");
+const hintLabel = document.getElementById("hint");
 
 function createFallbackImageDataUri(label) {
   const svg = `
@@ -47,16 +52,60 @@ function createFallbackImageDataUri(label) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-function isInsideControlZone(x, y) {
-  const rect = controlPanel.getBoundingClientRect();
-  const marginX = 36;
-  const marginY = 20;
+function isInsideElementZone(x, y, element, marginX, marginY) {
+  const rect = element.getBoundingClientRect();
   return (
     x >= rect.left - marginX &&
     x <= rect.right + marginX &&
     y >= rect.top - marginY &&
     y <= rect.bottom + marginY
   );
+}
+
+function isBlockedByOverlay(x, y) {
+  if (isInsideElementZone(x, y, controlPanel, 46, 26)) {
+    return true;
+  }
+  if (isInsideElementZone(x, y, anniversaryTitle, 30, 18)) {
+    return true;
+  }
+  if (isInsideElementZone(x, y, hintLabel, 30, 16)) {
+    return true;
+  }
+  return false;
+}
+
+function getValidStarPosition(size) {
+  const canvasPadding = 14;
+  const minDistanceBetweenStars = 24;
+
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const x =
+      Math.random() * (canvas.width - (canvasPadding + size) * 2) +
+      (canvasPadding + size);
+    const y =
+      Math.random() * (canvas.height - (canvasPadding + size) * 2) +
+      (canvasPadding + size);
+
+    if (isBlockedByOverlay(x, y)) {
+      continue;
+    }
+
+    const overlapsExistingStar = stars.some(star => {
+      const dist = Math.hypot(star.x - x, star.y - y);
+      return dist < minDistanceBetweenStars;
+    });
+
+    if (!overlapsExistingStar) {
+      return { x, y };
+    }
+  }
+
+  // Last-resort fallback keeps star in viewport.
+  return {
+    x: Math.max(canvasPadding + size, Math.min(canvas.width - (canvasPadding + size), canvas.width / 2)),
+    y: Math.max(canvasPadding + size, Math.min(canvas.height - (canvasPadding + size), canvas.height / 2))
+  };
 }
 
 const uniqueSpecialImages = [...images];
@@ -66,38 +115,25 @@ while (uniqueSpecialImages.length < SPECIAL_STAR_COUNT) {
   );
 }
 
-for (let i = 0; i < TOTAL_STARS; i++) {
-  stars.push({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    size: Math.random() * 2 + 1.5,
-    blink: Math.random(),
-    special: false,
-    img: images[Math.floor(Math.random() * images.length)]
-  });
+function buildStars() {
+  stars = [];
+
+  for (let i = 0; i < TOTAL_STARS; i++) {
+    const size = Math.random() * 1.4 + 3.0;
+    const pos = getValidStarPosition(size);
+
+    stars.push({
+      x: pos.x,
+      y: pos.y,
+      size,
+      blink: Math.random(),
+      special: true,
+      img: uniqueSpecialImages[i]
+    });
+  }
 }
 
-const candidateSpecialStarIndices = stars
-  .map((star, index) => (isInsideControlZone(star.x, star.y) ? -1 : index))
-  .filter(index => index !== -1);
-
-const starIndices =
-  candidateSpecialStarIndices.length >= SPECIAL_STAR_COUNT
-    ? candidateSpecialStarIndices
-    : [...Array(stars.length).keys()];
-
-for (let i = starIndices.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
-  [starIndices[i], starIndices[j]] = [starIndices[j], starIndices[i]];
-}
-
-for (let i = 0; i < SPECIAL_STAR_COUNT; i++) {
-  const index = starIndices[i];
-  const star = stars[index];
-  star.special = true;
-  star.size += 1.2;
-  star.img = uniqueSpecialImages[i];
-}
+buildStars();
 
 // ===== DRAW STARS =====
 function drawStars() {
@@ -135,7 +171,7 @@ canvas.addEventListener("click", (e) => {
   stars.forEach(star => {
     const dist = Math.hypot(star.x - x, star.y - y);
 
-    if (dist < 8 && star.special) {
+    if (dist < star.size + 5 && star.special) {
       showImage(star.img);
     }
   });
@@ -150,7 +186,7 @@ canvas.addEventListener("mousemove", (e) => {
 
   stars.forEach(star => {
     const dist = Math.hypot(star.x - x, star.y - y);
-    if (dist < 8 && star.special) {
+    if (dist < star.size + 5 && star.special) {
       canvas.style.cursor = "pointer";
     }
   });
