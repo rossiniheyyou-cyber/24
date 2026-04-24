@@ -6,7 +6,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="authScreen">
+  <h1>Private Anniversary Space</h1>
+  <p>Sign in with your approved Google account.</p>
+  <button id="googleSignInBtn">Sign in with Google</button>
+  <p id="authMessage"></p>
+</div>
 
+<div id="appRoot" class="hidden">
 <canvas id="sky"></canvas>
 
 <p id="anniversaryTitle">Happy Anniversary Mu ❤️</p>
@@ -25,7 +32,10 @@
   <span id="close">&times;</span>
   <img id="popupImg">
 </div>
+</div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
